@@ -1,62 +1,184 @@
-import React, { Component } from 'react';
-import ImagePicker from 'react-native-image-picker';
-import RNFetchBlob from 'react-native-fetch-blob';
+import React from 'react';
+import {
+  ActivityIndicator,
+  Button,
+  Clipboard,
+  Image,
+  Share,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Constants, ImagePicker } from 'expo';
+import uuid from 'uuid';
 import * as firebase from 'firebase';
 
-const Blob =  RNFetchBlob.polyfill.Blob
-const fs = RNFetchBlob.fs
-const ROOT_URL = 'https://us-central1-fir-otp-longblack.cloudfunctions.net';
+console.disableYellowBox = true;
 
-const config = {
-    apiKey: "AIzaSyCwE3hbbjog48VhhSYdCyxKF0lJA3vA3Xg",
-    authDomain: "inventoryapp-f69f2.firebaseapp.com",
-    databaseURL: "https://inventoryapp-f69f2.firebaseio.com",
-    projectId: "inventoryapp-f69f2",
-    storageBucket: "",
+const url =  'https://firebasestorage.googleapis.com/v0/b/blobtest-36ff6.appspot.com/o/Obsidian.jar?alt=media&token=93154b97-8bd9-46e3-a51f-67be47a4628a';
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAIbezdQjw0X9BYJgyHVMjAd4t4qFPhzts",
+    authDomain: "fir-otp-longblack.firebaseapp.com",
+    databaseURL: "https://fir-otp-longblack.firebaseio.com",
+    projectId: "fir-otp-longblack",
+    storageBucket: "fir-otp-longblack.appspot.com",
+    messagingSenderId: "902655967275"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+export default class App extends React.Component {
+  state = {
+    image: null,
+    uploading: false,
   };
-  firebase.initializeApp(config);
-  var database = firebase.database();
 
-window.XMLHttpRequest = RNFetchBlob.polyfill.XMLHttpRequest
-window.Blob = Blob
+  render() {
+    let { image } = this.state;
 
-/*
-    Allows users to select an image to upload, thus invoking the Image Picker
-    After selecting the image, pass the image to uploadImage func 
-*/
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        {image ? null : (
+          <Text
+            style={{
+              fontSize: 20,
+              marginBottom: 20,
+              textAlign: 'center',
+              marginHorizontal: 15,
+            }}>
+            Example: Upload ImagePicker result
+          </Text>
+        )}
 
-showImagePicker((response) => {
-    if(!response.didCancel){
-        uploadImage(response.uri)
+        <Button
+          onPress={this._pickImage}
+          title="Pick an image from camera roll"
+        />
+
+        <Button onPress={this._takePhoto} title="Take a photo" />
+
+        {this._maybeRenderImage()}
+        {this._maybeRenderUploadingOverlay()}
+
+        <StatusBar barStyle="default" />
+      </View>
+    );
+  }
+
+  _maybeRenderUploadingOverlay = () => {
+    if (this.state.uploading) {
+      return (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+          ]}>
+          <ActivityIndicator color="#fff" animating size="large" />
+        </View>
+      );
     }
-})
+  };
 
-export const uploadImage = ( uri, mime = 'application/octet-stream') => {
-    return(dispatch) => {
-        return new Promise((resolve, reject) => {
-            const uploadUri = Platform.OS === 'ios' ? uri.replace('file://', '') : uri
-            const sessionId = new Date().getTime()
-            let uploadBlob = null
-
-            // create ref in firebase storage for file
-            const imageRef = firebase.storage().ref('foldername').child('filename')
-        })
+  _maybeRenderImage = () => {
+    let { image } = this.state;
+    if (!image) {
+      return;
     }
+
+    return (
+      <View
+        style={{
+          marginTop: 30,
+          width: 250,
+          borderRadius: 3,
+          elevation: 2,
+        }}>
+        <View
+          style={{
+            borderTopRightRadius: 3,
+            borderTopLeftRadius: 3,
+            shadowColor: 'rgba(0,0,0,1)',
+            shadowOpacity: 0.2,
+            shadowOffset: { width: 4, height: 4 },
+            shadowRadius: 5,
+            overflow: 'hidden',
+          }}>
+          <Image source={{ uri: image }} style={{ width: 250, height: 250 }} />
+        </View>
+
+        <Text
+          onPress={this._copyToClipboard}
+          onLongPress={this._share}
+          style={{ paddingVertical: 10, paddingHorizontal: 10 }}>
+          {image}
+        </Text>
+      </View>
+    );
+  };
+
+  _share = () => {
+    Share.share({
+      message: this.state.image,
+      title: 'Check out this photo',
+      url: this.state.image,
+    });
+  };
+
+  _copyToClipboard = () => {
+    Clipboard.setString(this.state.image);
+    alert('Copied image URL to clipboard');
+  };
+
+  _takePhoto = async () => {
+    let pickerResult = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+    });
+
+    this._handleImagePicked(pickerResult);
+  };
+
+  _pickImage = async () => {
+    let pickerResult = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+    });
+
+    this._handleImagePicked(pickerResult);
+  };
+
+  _handleImagePicked = async pickerResult => {
+    try {
+      this.setState({ uploading: true });
+
+      if (!pickerResult.cancelled) {
+        uploadUrl = await uploadImageAsync(pickerResult.uri);
+        this.setState({ image: uploadUrl });
+      }
+    } catch (e) {
+      console.log(e);
+      alert('Upload failed, sorry :(');
+    } finally {
+      this.setState({ uploading: false });
+    }
+  };
 }
 
+async function uploadImageAsync(uri) {
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  const ref = firebase
+    .storage()
+    .ref()
+    .child(uuid.v4());
 
-class blob extends Component {
-
-    
-
-    render(){
-        return(
-            
-        );
-    };
-
+  const snapshot = await ref.put(blob);
+  return snapshot.downloadURL;
 }
-
-export const uploadImage = ( uri, mime )
-
-export default blob;
